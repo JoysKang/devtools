@@ -1,6 +1,6 @@
 use dioxus::prelude::*;
 use json5;
-use json_repair::repair_json_string;
+use json_repair::repair_json_string_parallel;
 use serde_json::Value;
 
 #[component]
@@ -23,7 +23,7 @@ pub fn JsonFormat() -> Element {
             }
             Err(_) => {
                 // json5 解析失败，尝试使用 json-repair 修复
-                match repair_json_string(&new_input) {
+                match repair_json_string_parallel(&new_input) {
                     Ok(repaired) => {
                         // 修复成功，再次尝试解析和美化
                         match serde_json::from_str::<Value>(&repaired.to_string()) {
