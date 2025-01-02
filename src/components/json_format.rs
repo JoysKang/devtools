@@ -8,6 +8,25 @@ use arboard::Clipboard;
 pub fn JsonFormat() -> Element {
     let mut input = use_signal(String::new);
     let mut output = use_signal(String::new);
+    let mut show_search = use_signal(|| false);
+    let mut search_query = use_signal(String::new);
+
+    // 处理搜索逻辑
+    let mut handle_search = move |query: String| {
+        search_query.set(query.clone());
+        // 如果搜索词为空，不执行搜索
+        if query.is_empty() {
+            return;
+        }
+        
+        // TODO: 实现文本框选中和滚动到第一个匹配项的功能
+    };
+
+    // 关闭搜索
+    let close_search = move |_| {
+        show_search.set(false);
+        search_query.set(String::new());
+    };
 
     let mut format_json = move |new_input: String| {
         input.set(new_input.clone());
@@ -83,16 +102,31 @@ pub fn JsonFormat() -> Element {
         }
     };
 
-    // 搜索功能 (这里只是一个示例实现)
-    let search_text = move |_| {
-        // TODO: 实现搜索功能
-        // log::info!("搜索功能待实现");
-        println!("搜索功能待实现");
-    };
-
     rsx! {
         div {
             style: "display: flex; flex-direction: column; gap: 20px; height: 100%;",
+            // 修改条件渲染语法
+            if show_search() {
+                div {
+                    style: "position: absolute; top: 10px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; background: white; padding: 10px; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);",
+                    input {
+                        style: "padding: 5px 10px; border: 1px solid #ccc; border-radius: 4px; width: 200px;",
+                        placeholder: "输入搜索内容...",
+                        value: "{search_query}",
+                        autofocus: true,
+                        oninput: move |evt| handle_search(evt.data.value())
+                    }
+                    button {
+                        onclick: close_search,
+                        title: "关闭",
+                        img {
+                            src: "assets/icons/close.svg",
+                            alt: "close",
+                            style: "width: 16px; height: 16px;"
+                        }
+                    }
+                }
+            }
             div {
                 style: "display: flex; gap: 20px; flex: 1;",
                 div {
@@ -100,7 +134,6 @@ pub fn JsonFormat() -> Element {
                     // 输入框上方的按钮组
                     div {
                         style: "display: flex; justify-content: flex-end; gap: 10px; margin-bottom: 10px;",
-                        
                         button {
                             onclick: paste_input,
                             title: "从剪贴板粘贴",
@@ -129,7 +162,7 @@ pub fn JsonFormat() -> Element {
                             }
                         }
                         button {
-                            onclick: search_text,
+                            onclick: move |_| show_search.set(true),
                             title: "搜索",
                             img {
                                 src: "assets/icons/search.svg",
@@ -164,7 +197,7 @@ pub fn JsonFormat() -> Element {
                             }
                         }
                         button {
-                            onclick: search_text,
+                            onclick: move |_| show_search.set(true),
                             title: "搜索",
                             img {
                                 src: "assets/icons/search.svg",
