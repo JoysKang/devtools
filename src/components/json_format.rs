@@ -49,10 +49,21 @@ pub fn JsonFormat() -> Element {
         }
     };
 
-    // 修复复制功能
+    // 修改复制功能，移除提示信息后再复制
     let copy_output = move |_| {
         if let Ok(mut clipboard) = Clipboard::new() {
-            let _ = clipboard.set_text(&output.to_string());
+            // 获取输出内容
+            let content = output.to_string();
+            
+            // 移除提示信息后的实际内容
+            let clean_content = if content.starts_with("// 注意：输入的 JSON 已被自动修复\n") {
+                content.replace("// 注意：输入的 JSON 已被自动修复\n", "")
+            } else {
+                content
+            };
+            
+            // 设置到剪贴板
+            let _ = clipboard.set_text(&clean_content);
         }
     };
 
@@ -62,6 +73,13 @@ pub fn JsonFormat() -> Element {
             if let Ok(text) = clipboard.get_text() {
                 format_json(text);
             }
+        }
+    };
+
+    // 添加新的复制输入内容功能
+    let copy_input = move |_| {
+        if let Ok(mut clipboard) = Clipboard::new() {
+            let _ = clipboard.set_text(&input.to_string());
         }
     };
 
@@ -86,17 +104,38 @@ pub fn JsonFormat() -> Element {
                         button {
                             onclick: paste_input,
                             title: "从剪贴板粘贴",
-                            "📋"
+                            img {
+                                src: "assets/icons/paste.svg",
+                                alt: "paste",
+                                style: "width: 16px; height: 16px;"
+                            }
+                        }
+                        button {
+                            onclick: copy_input,
+                            title: "复制到剪贴板",
+                            img {
+                                src: "assets/icons/copy.svg",
+                                alt: "copy",
+                                style: "width: 16px; height: 16px;"
+                            }
                         }
                         button {
                             onclick: move |_| format_json(String::new()),
                             title: "清空",
-                            "🗑️"
+                            img {
+                                src: "assets/icons/clear.svg",
+                                alt: "clear",
+                                style: "width: 16px; height: 16px;"
+                            }
                         }
                         button {
                             onclick: search_text,
                             title: "搜索",
-                            "🔍"
+                            img {
+                                src: "assets/icons/search.svg",
+                                alt: "search",
+                                style: "width: 16px; height: 16px;"
+                            }
                         }
                     }
                     textarea {
@@ -118,12 +157,20 @@ pub fn JsonFormat() -> Element {
                         button {
                             onclick: copy_output,
                             title: "复制到剪贴板",
-                            "📋"
+                            img {
+                                src: "assets/icons/copy.svg",
+                                alt: "copy",
+                                style: "width: 16px; height: 16px;"
+                            }
                         }
                         button {
                             onclick: search_text,
                             title: "搜索",
-                            "🔍"
+                            img {
+                                src: "assets/icons/search.svg",
+                                alt: "search",
+                                style: "width: 16px; height: 16px;"
+                            }
                         }
                     }
                     textarea {
