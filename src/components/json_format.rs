@@ -56,29 +56,79 @@ pub fn JsonFormat() -> Element {
         }
     };
 
+    // 添加粘贴功能
+    let paste_input = move |_| {
+        if let Ok(mut clipboard) = Clipboard::new() {
+            if let Ok(text) = clipboard.get_text() {
+                format_json(text);
+            }
+        }
+    };
+
+    // 搜索功能 (这里只是一个示例实现)
+    let search_text = move |_| {
+        // TODO: 实现搜索功能
+        // log::info!("搜索功能待实现");
+        println!("搜索功能待实现");
+    };
+
     rsx! {
         div {
             style: "display: flex; flex-direction: column; gap: 20px; height: 100%;",
             div {
                 style: "display: flex; gap: 20px; flex: 1;",
-                textarea {
-                    autocomplete: "off",
-                    style: "flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 4px; resize: none; font-size: 16px; font-family: monospace;",
-                    placeholder: "请输入要格式化的 JSON...",
-                    value: "{input}",
-                    oninput: move |evt| format_json(evt.data.value())
-                }
                 div {
-                    style: "flex: 1; display: flex; flex-direction: column;",
+                    style: "flex: 1; display: flex; flex-direction: column; padding-right: 10px;",
+                    // 输入框上方的按钮组
                     div {
-                        style: "display: flex; justify-content: space-between; margin-bottom: 10px;",
+                        style: "display: flex; justify-content: flex-end; gap: 10px; margin-bottom: 10px;",
+                        
                         button {
-                            onclick: copy_output,
-                            "复制结果"
+                            onclick: paste_input,
+                            title: "从剪贴板粘贴",
+                            "📋"
+                        }
+                        button {
+                            onclick: move |_| format_json(String::new()),
+                            title: "清空",
+                            "🗑️"
+                        }
+                        button {
+                            onclick: search_text,
+                            title: "搜索",
+                            "🔍"
                         }
                     }
                     textarea {
-                        style: "flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 4px; resize: none; font-size: 16px; font-family: monospace;",
+                        style: "width: 100%; flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 4px; resize: none; font-size: 16px; font-family: monospace;",
+                        autofocus: true,
+                        // 使用多个属性组合来禁用自动完成
+                        autocomplete: "off",
+                        spellcheck: "false",
+                        placeholder: "请输入要格式化的 JSON...",
+                        value: "{input}",
+                        oninput: move |evt| format_json(evt.data.value()),
+                    }
+                }
+                div {
+                    style: "flex: 1; display: flex; flex-direction: column; padding-right: 10px;",
+                    // 输出框上方的按钮组
+                    div {
+                        style: "display: flex; justify-content: flex-end; gap: 10px; margin-bottom: 10px;",
+                        button {
+                            onclick: copy_output,
+                            title: "复制到剪贴板",
+                            "📋"
+                        }
+                        button {
+                            onclick: search_text,
+                            title: "搜索",
+                            "🔍"
+                        }
+                    }
+                    textarea {
+                        autocomplete: "off",
+                        style: "width: 100%; flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 4px; resize: none; font-size: 16px; font-family: monospace;",
                         readonly: true,
                         placeholder: "格式化结果将在这里显示...",
                         value: "{output}"
