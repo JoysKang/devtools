@@ -10,10 +10,10 @@ rust-version = "1.85.0"
 [dependencies]
 dioxus = { version = "0.6.0", features = ["desktop"] }
 dioxus-router = "0.6.0"
-json5 = "0.4.1"
-json-repair = "0.4.0"
-serde_json = "1.0.134"
-web-sys = { version = "0.3", features = ["Clipboard", "Navigator", "Window"] }
+json5 = "0.4.1"  # 解析 JSON5 格式
+json-repair = "0.4.0"   # 修复 JSON 格式
+serde_json = "1.0.134"  # 处理 JSON 数据
+arboard = "3.3"  # 用于原生平台的剪贴板操作
 
 
 [features]

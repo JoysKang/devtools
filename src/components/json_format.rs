@@ -2,6 +2,7 @@ use dioxus::prelude::*;
 use json5;
 use json_repair::repair_json_string_parallel;
 use serde_json::Value;
+use arboard::Clipboard;
 
 #[component]
 pub fn JsonFormat() -> Element {
@@ -50,10 +51,8 @@ pub fn JsonFormat() -> Element {
 
     // 修复复制功能
     let copy_output = move |_| {
-        if let Some(window) = web_sys::window() {
-            let navigator = window.navigator();
-            let clipboard = navigator.clipboard();
-            let _ = clipboard.write_text(&output.to_string());
+        if let Ok(mut clipboard) = Clipboard::new() {
+            let _ = clipboard.set_text(&output.to_string());
         }
     };
 
