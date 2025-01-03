@@ -1,0 +1,11 @@
+targets:
+  $default:            # 默认目标配置
+    builders:          # 构建器配置
+      build_runner:    # build_runner 工具的配置
+        options:
+          output: build/   # 构建输出目录
+        generate_for:      # 指定需要生成代码的文件范围
+          - lib/**        # 处理 lib 目录下的所有文件
+    sources:           # 源文件配置
+      - lib/**        # 包含 lib 目录下所有文件
+      - pubspec.yaml  # 包含 pubspec.yaml 文件
