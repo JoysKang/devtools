@@ -46,3 +46,6 @@ app.*.map.json
 
 # Rust
 rust_builder/
+
+# cursor
+.cursorrules
