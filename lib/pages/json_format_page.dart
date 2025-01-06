@@ -39,6 +39,16 @@ class _JsonFormatPageState extends State<JsonFormatPage> {
   late final TextEditingController _inputController;
   late final TextEditingController _outputController;
 
+  // 搜索相关状态
+  bool _showInputSearch = false;
+  bool _showOutputSearch = false;
+  final TextEditingController _inputSearchController = TextEditingController();
+  final TextEditingController _outputSearchController = TextEditingController();
+  List<TextSelection> _inputSearchResults = [];
+  List<TextSelection> _outputSearchResults = [];
+  int _currentInputSearchIndex = -1;
+  int _currentOutputSearchIndex = -1;
+
   @override
   void initState() {
     super.initState();
@@ -51,6 +61,8 @@ class _JsonFormatPageState extends State<JsonFormatPage> {
     _debounceTimer?.cancel();
     _inputController.dispose();
     _outputController.dispose();
+    _inputSearchController.dispose();
+    _outputSearchController.dispose();
     super.dispose();
   }
 
@@ -171,12 +183,110 @@ class _JsonFormatPageState extends State<JsonFormatPage> {
     );
   }
 
+  // 搜索处理方法
+  void _searchInText(String searchText, TextEditingController textController,
+      void Function(List<TextSelection>) onResultsFound) {
+    if (searchText.isEmpty) {
+      onResultsFound([]);
+      return;
+    }
+
+    final text = textController.text.toLowerCase();
+    final searchLower = searchText.toLowerCase();
+    final results = <TextSelection>[];
+
+    int start = 0;
+    while (true) {
+      start = text.indexOf(searchLower, start);
+      if (start == -1) break;
+      results.add(TextSelection(
+        baseOffset: start,
+        extentOffset: start + searchText.length,
+      ));
+      start += searchText.length;
+    }
+
+    onResultsFound(results);
+  }
+
+  // 搜索框组件
+  Widget _buildSearchBar({
+    required TextEditingController searchController,
+    required VoidCallback onClose,
+    required Function(String) onSearch,
+    required int currentIndex,
+    required int totalResults,
+  }) {
+    return Container(
+      height: 40,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: Colors.grey[300]!),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: searchController,
+              decoration: const InputDecoration(
+                hintText: '搜索...',
+                border: InputBorder.none,
+                isDense: true,
+              ),
+              onChanged: onSearch,
+            ),
+          ),
+          if (totalResults > 0) ...[
+            Text('${currentIndex + 1}/$totalResults',
+                style: TextStyle(color: Colors.grey[600])),
+            const SizedBox(width: 8),
+            IconButton(
+              icon: const Icon(Icons.keyboard_arrow_up, size: 20),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              onPressed: currentIndex > 0
+                  ? () => onSearch(searchController.text)
+                  : null,
+            ),
+            const SizedBox(width: 4),
+            IconButton(
+              icon: const Icon(Icons.keyboard_arrow_down, size: 20),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              onPressed: currentIndex < totalResults - 1
+                  ? () => onSearch(searchController.text)
+                  : null,
+            ),
+          ],
+          const SizedBox(width: 8),
+          IconButton(
+            icon: const Icon(Icons.close, size: 20),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+            onPressed: onClose,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 修改编辑器区域构建方法
   Widget _buildEditorArea({
     required TextEditingController controller,
     required List<Widget> actions,
+    required bool isInput,
     bool readOnly = false,
     String? hintText,
   }) {
+    final isShowingSearch = isInput ? _showInputSearch : _showOutputSearch;
+    final searchController =
+        isInput ? _inputSearchController : _outputSearchController;
+    final searchResults = isInput ? _inputSearchResults : _outputSearchResults;
+    final currentSearchIndex =
+        isInput ? _currentInputSearchIndex : _currentOutputSearchIndex;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
@@ -184,18 +294,115 @@ class _JsonFormatPageState extends State<JsonFormatPage> {
           mainAxisSize: MainAxisSize.min,
           children: actions,
         ),
+        if (isShowingSearch)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: _buildSearchBar(
+              searchController: searchController,
+              onClose: () => setState(() {
+                if (isInput) {
+                  _showInputSearch = false;
+                  _inputSearchResults.clear();
+                } else {
+                  _showOutputSearch = false;
+                  _outputSearchResults.clear();
+                }
+              }),
+              onSearch: (text) {
+                _searchInText(text, controller, (results) {
+                  setState(() {
+                    if (isInput) {
+                      _inputSearchResults = results;
+                      _currentInputSearchIndex = results.isEmpty ? -1 : 0;
+                    } else {
+                      _outputSearchResults = results;
+                      _currentOutputSearchIndex = results.isEmpty ? -1 : 0;
+                    }
+                  });
+                });
+              },
+              currentIndex: currentSearchIndex,
+              totalResults: searchResults.length,
+            ),
+          ),
         Expanded(
           child: Container(
             decoration: _kBoxDecoration,
-            child: _buildTextField(
+            child: TextField(
               controller: controller,
               readOnly: readOnly,
-              hintText: hintText,
+              maxLines: null,
+              expands: true,
+              textAlignVertical: TextAlignVertical.top,
+              decoration: InputDecoration(
+                hintText: hintText,
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.all(16),
+              ),
+              style: _kTextStyle,
             ),
           ),
         ),
       ],
     );
+  }
+
+  // 修改搜索按钮的构建
+  List<Widget> _buildActionButtons(bool isInput) {
+    final List<Widget> actions = [];
+
+    if (isInput) {
+      actions.addAll([
+        _buildActionButton(
+          Icons.paste,
+          '粘贴',
+          () async {
+            final data = await Clipboard.getData(Clipboard.kTextPlain);
+            if (data?.text != null) {
+              setState(() => _inputController.text = data!.text!);
+            }
+          },
+        ),
+        _buildActionButton(
+          Icons.file_copy_outlined,
+          '复制',
+          () => _copyToClipboard(_inputController.text),
+        ),
+      ]);
+    } else {
+      actions.add(
+        _buildActionButton(
+          Icons.file_copy_outlined,
+          '复制',
+          () => _copyToClipboard(_outputController.text),
+        ),
+      );
+    }
+
+    // 添加搜索按钮
+    actions.add(
+      _buildActionButton(
+        Icons.search,
+        '搜索',
+        () => setState(() {
+          if (isInput) {
+            _showInputSearch = !_showInputSearch;
+            if (!_showInputSearch) {
+              _inputSearchResults.clear();
+              _currentInputSearchIndex = -1;
+            }
+          } else {
+            _showOutputSearch = !_showOutputSearch;
+            if (!_showOutputSearch) {
+              _outputSearchResults.clear();
+              _currentOutputSearchIndex = -1;
+            }
+          }
+        }),
+      ),
+    );
+
+    return actions;
   }
 
   Widget _buildIndentSelector() {
@@ -267,31 +474,9 @@ class _JsonFormatPageState extends State<JsonFormatPage> {
                   Expanded(
                     child: _buildEditorArea(
                       controller: _inputController,
+                      actions: _buildActionButtons(true),
+                      isInput: true,
                       hintText: '在此粘贴您的JSON数据...',
-                      actions: [
-                        _buildActionButton(
-                          Icons.paste,
-                          '粘贴',
-                          () async {
-                            final data =
-                                await Clipboard.getData(Clipboard.kTextPlain);
-                            if (data?.text != null) {
-                              setState(
-                                  () => _inputController.text = data!.text!);
-                            }
-                          },
-                        ),
-                        _buildActionButton(
-                          Icons.file_copy_outlined,
-                          '复制',
-                          () => _copyToClipboard(_inputController.text),
-                        ),
-                        _buildActionButton(
-                          Icons.search,
-                          '搜索',
-                          () {/* TODO */},
-                        ),
-                      ],
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -300,20 +485,10 @@ class _JsonFormatPageState extends State<JsonFormatPage> {
                       children: [
                         _buildEditorArea(
                           controller: _outputController,
+                          actions: _buildActionButtons(false),
+                          isInput: false,
                           readOnly: true,
                           hintText: '格式化输出将显示在这里',
-                          actions: [
-                            _buildActionButton(
-                              Icons.file_copy_outlined,
-                              '复制',
-                              () => _copyToClipboard(_outputController.text),
-                            ),
-                            _buildActionButton(
-                              Icons.search,
-                              '搜索',
-                              () {/* TODO */},
-                            ),
-                          ],
                         ),
                         if (_isFormatting)
                           const Positioned.fill(
