@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../src/rust/api/json_format.dart';
-import 'dart:async'; // 用于防抖
+import 'dart:async';
 
 class JsonFormatPage extends StatefulWidget {
   const JsonFormatPage({super.key});
@@ -11,9 +11,24 @@ class JsonFormatPage extends StatefulWidget {
 }
 
 class _JsonFormatPageState extends State<JsonFormatPage> {
-  // 常量定义
+  // 常量和样式定义
   static const _kIndentOptions = ['2 空格', '4 空格', '压缩', 'Tab'];
-  static const _kDebounceMs = 300; // 防抖时间
+  static const _kDebounceMs = 300;
+
+  static const _kTextStyle = TextStyle(
+    fontFamily: 'monospace',
+    fontSize: 14,
+  );
+
+  static const _kBorderRadius = BorderRadius.all(Radius.circular(4));
+
+  static final _kBorderSide = BorderSide(color: Colors.grey[300]!);
+
+  static final _kBoxDecoration = BoxDecoration(
+    color: Colors.white,
+    border: Border.all(color: Colors.grey[300]!),
+    borderRadius: _kBorderRadius,
+  );
 
   // 状态变量
   String _indentSize = '4 空格';
@@ -21,61 +36,58 @@ class _JsonFormatPageState extends State<JsonFormatPage> {
   Timer? _debounceTimer;
 
   // 控制器
-  final TextEditingController _inputController = TextEditingController();
-  final TextEditingController _outputController = TextEditingController();
+  late final TextEditingController _inputController;
+  late final TextEditingController _outputController;
 
   @override
   void initState() {
     super.initState();
-    _inputController.addListener(_onInputChanged);
+    _inputController = TextEditingController()..addListener(_onInputChanged);
+    _outputController = TextEditingController();
   }
 
   @override
   void dispose() {
     _debounceTimer?.cancel();
-    _inputController.removeListener(_onInputChanged);
     _inputController.dispose();
     _outputController.dispose();
     super.dispose();
   }
 
-  // 输入变化处理（添加防抖）
+  // 输入处理
   void _onInputChanged() {
     final input = _inputController.text;
-
-    // 如果输入为空，立即清空输出
     if (input.isEmpty) {
-      _outputController.text = '';
+      _outputController.clear();
       return;
     }
 
-    // 其他情况使用防抖
     _debounceTimer?.cancel();
-    _debounceTimer =
-        Timer(const Duration(milliseconds: _kDebounceMs), _formatJson);
+    _debounceTimer = Timer(
+      const Duration(milliseconds: _kDebounceMs),
+      _formatJson,
+    );
   }
 
-  // JSON 格式化处理
+  // 格式化处理
   Future<void> _formatJson() async {
     final input = _inputController.text;
-    if (input.isEmpty) {
-      _outputController.text = '';
-      return;
-    }
-
-    if (_isFormatting) return;
+    if (input.isEmpty || _isFormatting) return;
 
     setState(() => _isFormatting = true);
 
     try {
-      final formatted = await formatJson(input: input);
+      final formatted = await formatJson(
+        input: input,
+        indentType: _getIndentType(),
+      );
       if (mounted) {
         _outputController.text = formatted;
       }
     } catch (e) {
       if (mounted) {
         _outputController.text = '格式化出错: $e';
-        _showError('格式化失败: $e');
+        _showSnackBar('格式化失败: $e', isError: true);
       }
     } finally {
       if (mounted) {
@@ -84,36 +96,49 @@ class _JsonFormatPageState extends State<JsonFormatPage> {
     }
   }
 
-  // 错误提示
-  void _showError(String message) {
+  // 工具方法
+  IndentType _getIndentType() {
+    switch (_indentSize) {
+      case '2 空格':
+        return IndentType.spaces2;
+      case '4 空格':
+        return IndentType.spaces4;
+      case 'Tab':
+        return IndentType.tab;
+      case '压缩':
+        return IndentType.none;
+      default:
+        return IndentType.spaces2;
+    }
+  }
+
+  Future<void> _copyToClipboard(String text) async {
+    await Clipboard.setData(ClipboardData(text: text));
+    if (mounted) {
+      _showSnackBar('已复制到剪贴板');
+    }
+  }
+
+  void _showSnackBar(String message, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: Colors.red,
+        duration: const Duration(seconds: 1),
+        backgroundColor: isError ? Colors.red : null,
       ),
     );
   }
 
-  // 复制到剪贴板
-  Future<void> _copyToClipboard(String text) async {
-    await Clipboard.setData(ClipboardData(text: text));
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('已复制到剪贴板'),
-          duration: Duration(seconds: 1),
-        ),
-      );
-    }
-  }
-
-  // UI 组件构建方法
+  // UI 组件
   Widget _buildActionButton(
-      IconData icon, String tooltip, VoidCallback onPressed) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: Tooltip(
-        message: tooltip,
+    IconData icon,
+    String tooltip,
+    VoidCallback onPressed,
+  ) {
+    return Tooltip(
+      message: tooltip,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
         child: GestureDetector(
           onTap: onPressed,
           child: Padding(
@@ -125,13 +150,64 @@ class _JsonFormatPageState extends State<JsonFormatPage> {
     );
   }
 
+  Widget _buildTextField({
+    required TextEditingController controller,
+    bool readOnly = false,
+    String? hintText,
+    EdgeInsets? contentPadding,
+  }) {
+    return TextField(
+      controller: controller,
+      readOnly: readOnly,
+      maxLines: null,
+      expands: true,
+      textAlignVertical: TextAlignVertical.top,
+      decoration: InputDecoration(
+        hintText: hintText,
+        border: InputBorder.none,
+        contentPadding: contentPadding ?? const EdgeInsets.all(16),
+      ),
+      style: _kTextStyle,
+    );
+  }
+
+  Widget _buildEditorArea({
+    required TextEditingController controller,
+    required List<Widget> actions,
+    bool readOnly = false,
+    String? hintText,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: actions,
+        ),
+        Expanded(
+          child: Container(
+            decoration: _kBoxDecoration,
+            child: _buildTextField(
+              controller: controller,
+              readOnly: readOnly,
+              hintText: hintText,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildIndentSelector() {
     return Row(
       children: [
         const Text('缩进：'),
         PopupMenuButton<String>(
           initialValue: _indentSize,
-          onSelected: (value) => setState(() => _indentSize = value),
+          onSelected: (value) {
+            setState(() => _indentSize = value);
+            _formatJson();
+          },
           itemBuilder: (context) => _kIndentOptions.map((value) {
             return PopupMenuItem<String>(
               value: value,
@@ -144,7 +220,7 @@ class _JsonFormatPageState extends State<JsonFormatPage> {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
               border: Border.all(color: Colors.grey[300]!),
-              borderRadius: BorderRadius.circular(4),
+              borderRadius: _kBorderRadius,
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -153,113 +229,6 @@ class _JsonFormatPageState extends State<JsonFormatPage> {
                 const Icon(Icons.arrow_drop_down),
               ],
             ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildInputArea() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildActionButton(
-              Icons.paste,
-              '粘贴',
-              () async {
-                final data = await Clipboard.getData(Clipboard.kTextPlain);
-                if (data?.text != null) {
-                  setState(() => _inputController.text = data!.text!);
-                }
-              },
-            ),
-            _buildActionButton(
-              Icons.file_copy_outlined,
-              '复制',
-              () => _copyToClipboard(_inputController.text),
-            ),
-            _buildActionButton(Icons.search, '搜索', () {/* TODO */}),
-          ],
-        ),
-        Expanded(
-          child: Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border.all(color: Colors.grey[300]!),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: TextField(
-              controller: _inputController,
-              maxLines: null,
-              expands: true,
-              textAlignVertical: TextAlignVertical.top,
-              decoration: const InputDecoration(
-                hintText: '在此粘贴您的JSON数据...',
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.all(16),
-              ),
-              style: const TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 14,
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildOutputArea() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildActionButton(
-              Icons.file_copy_outlined,
-              '复制',
-              () => _copyToClipboard(_outputController.text),
-            ),
-            _buildActionButton(Icons.search, '搜索', () {/* TODO */}),
-          ],
-        ),
-        Expanded(
-          child: Stack(
-            children: [
-              Container(
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  border: Border.all(color: Colors.grey[300]!),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                padding: const EdgeInsets.all(16),
-                child: TextField(
-                  controller: _outputController,
-                  readOnly: true,
-                  maxLines: null,
-                  expands: true,
-                  textAlignVertical: TextAlignVertical.top,
-                  decoration: const InputDecoration(
-                    hintText: '格式化输出将显示在这里',
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                  style: const TextStyle(
-                    fontFamily: 'monospace',
-                    fontSize: 14,
-                  ),
-                ),
-              ),
-              if (_isFormatting)
-                const Positioned.fill(
-                  child: Center(child: CircularProgressIndicator()),
-                ),
-            ],
           ),
         ),
       ],
@@ -276,9 +245,7 @@ class _JsonFormatPageState extends State<JsonFormatPage> {
             padding: const EdgeInsets.all(8.0),
             decoration: BoxDecoration(
               color: Colors.grey[100],
-              border: Border(
-                bottom: BorderSide(color: Colors.grey[300]!, width: 1),
-              ),
+              border: Border(bottom: _kBorderSide),
             ),
             child: Row(
               children: [
@@ -297,9 +264,64 @@ class _JsonFormatPageState extends State<JsonFormatPage> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Expanded(child: _buildInputArea()),
+                  Expanded(
+                    child: _buildEditorArea(
+                      controller: _inputController,
+                      hintText: '在此粘贴您的JSON数据...',
+                      actions: [
+                        _buildActionButton(
+                          Icons.paste,
+                          '粘贴',
+                          () async {
+                            final data =
+                                await Clipboard.getData(Clipboard.kTextPlain);
+                            if (data?.text != null) {
+                              setState(
+                                  () => _inputController.text = data!.text!);
+                            }
+                          },
+                        ),
+                        _buildActionButton(
+                          Icons.file_copy_outlined,
+                          '复制',
+                          () => _copyToClipboard(_inputController.text),
+                        ),
+                        _buildActionButton(
+                          Icons.search,
+                          '搜索',
+                          () {/* TODO */},
+                        ),
+                      ],
+                    ),
+                  ),
                   const SizedBox(width: 16),
-                  Expanded(child: _buildOutputArea()),
+                  Expanded(
+                    child: Stack(
+                      children: [
+                        _buildEditorArea(
+                          controller: _outputController,
+                          readOnly: true,
+                          hintText: '格式化输出将显示在这里',
+                          actions: [
+                            _buildActionButton(
+                              Icons.file_copy_outlined,
+                              '复制',
+                              () => _copyToClipboard(_outputController.text),
+                            ),
+                            _buildActionButton(
+                              Icons.search,
+                              '搜索',
+                              () {/* TODO */},
+                            ),
+                          ],
+                        ),
+                        if (_isFormatting)
+                          const Positioned.fill(
+                            child: Center(child: CircularProgressIndicator()),
+                          ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),

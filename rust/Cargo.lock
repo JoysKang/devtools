@@ -999,6 +999,7 @@ dependencies = [
  "flutter_rust_bridge",
  "json-repair",
  "json5",
+ "serde",
  "serde_json",
 ]
 

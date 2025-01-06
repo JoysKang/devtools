@@ -6,5 +6,27 @@
 import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-Future<String> formatJson({required String input}) =>
-    RustLib.instance.api.crateApiJsonFormatFormatJson(input: input);
+// These functions are ignored because they are not marked as `pub`: `format_value`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `fmt`
+
+/// 格式化 JSON 字符串
+///
+/// # 参数
+/// * `input` - 输入的 JSON 字符串
+/// * `indent_type` - 缩进类型
+///
+/// # 返回
+/// * 格式化后的 JSON 字符串，或错误信息
+Future<String> formatJson(
+        {required String input, required IndentType indentType}) =>
+    RustLib.instance.api
+        .crateApiJsonFormatFormatJson(input: input, indentType: indentType);
+
+/// JSON 缩进类型
+enum IndentType {
+  spaces2,
+  spaces4,
+  tab,
+  none,
+  ;
+}
