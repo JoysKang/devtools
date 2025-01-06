@@ -6,7 +6,5 @@
 import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-Future<String> greet2({required String name}) =>
-    RustLib.instance.api.crateApiJsonFormatGreet2(name: name);
-
-Future<void> initApp() => RustLib.instance.api.crateApiJsonFormatInitApp();
+Future<String> formatJson({required String input}) =>
+    RustLib.instance.api.crateApiJsonFormatFormatJson(input: input);
